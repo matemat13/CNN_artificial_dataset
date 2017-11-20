@@ -1,0 +1,12 @@
+# Ignore images of all types (too large for a git repo)
+*.png
+*.PNG
+*.jpg
+*.JPG
+*.xcf
+# Ignore the generated dataset files
+dataset
+# Ignore vim swap files
+*.swp
+# Ignore PyCharm project folder
+.idea
