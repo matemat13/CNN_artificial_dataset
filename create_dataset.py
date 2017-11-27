@@ -2,115 +2,152 @@
 
 try:
     from PIL import Image
+    from PIL import ImageEnhance
 except ImportError:
     import Image
 import random as rnd
 import numpy as np
+import os
 
-def main():
-    # TODO: Load these parameters from a file or command line
-    drone_im_fnames = {"drone_images/drona1.png",
-                       "drone_images/drona_na_nebi1.png",
-                       "drone_images/drona_cerna.png"}
-    backg_im_fnames = {"backg_images/backg_bily.png",
-                       "backg_images/backg_les1.png",
-                       "backg_images/backg_les2.png",
-                       "backg_images/backg_poust1.png",
-                       "backg_images/backg_poust2.png",
-                       }
-    n_rn_imgs = 3
-    minimal_bb_width  = 100
-    minimal_bb_height = 80
-    max_rotation = 45 # in degrees
-    out_folder = "dataset"
-    labels_fname = "labels.csv"
+# TODO: Load these parameters from a file or command line
+# Settings for the image generation
+max_bg_im_width = 640
+max_bg_im_height = 480
+minimal_bb_width = 100
+minimal_bb_height = 80
+max_rotation = 45  # in degrees
+max_objects_in_image = 4
+label = 0
+min_contrast_change = 0.25
+max_brightness_change = 0.25
 
-    print("Loading background images:")
-    backg_ims = []
-    for im_fname in backg_im_fnames:
-        backg_ims.append(Image.open(im_fname))
-        print(im_fname, "-", backg_ims[len(backg_ims)-1].mode)
 
-    print("Loading drone images:")
-    drone_ims = []
-    for im_fname in drone_im_fnames:
-        drone_ims.append(Image.open(im_fname))
-        print(im_fname, "-", drone_ims[len(drone_ims)-1].mode)
-
-    tot_imgs = n_rn_imgs*len(drone_ims)*len(backg_ims)
-    print("Starting dataset generation of {:d} total images".format(tot_imgs))
-    # final_ims = n_rn_imgs*len(drone_ims)*len(backg_ims)*[None]
-    labels = tot_imgs*[None]
-
+def generate_images(backgr_ims, object_ims, n_imgs, out_folder):
     im_it = 0
-    for backg_im in backg_ims:
-        bg_size = backg_im.size
-        maximal_bb_width  = int(np.round(bg_size[0]*0.25))
-        maximal_bb_height = int(np.round(bg_size[1]*0.25))
-        for drone_im in drone_ims:
-            dr_size = drone_im.size
+    # Generate n_rn_imgs of random images
+    for rn_it in range(0, n_imgs):
+        backgr_im = backgr_ims[rnd.randint(0, len(backgr_ims)-1)]
+        bg_size = backgr_im.size
+        bg_width = bg_size[0]
+        bg_height = bg_size[1]
+        maximal_bb_width  = int(np.round(bg_width*0.25))
+        maximal_bb_height = int(np.round(bg_height*0.25))
+
+        n_objects_in_image = rnd.randint(1, max_objects_in_image)
+        object_bbs_in_image = n_objects_in_image*[None]
+
+        generated_image = Image.new("RGBA", backgr_im.size)
+        generated_image.paste(backgr_im, (0,0), backgr_im)
+
+        for obj_it in range(0, n_objects_in_image):
+            object_im = object_ims[rnd.randint(0, len(object_ims)-1)]
+            dr_size = object_im.size
 
             xpos_min = 0
             ypos_min = 0
 
             width_min = minimal_bb_width
             height_min = minimal_bb_height
-            width_max = min(bg_size[0], dr_size[0], maximal_bb_width)
-            height_max = min(bg_size[1], dr_size[1], maximal_bb_height)
-            for rn_it in range(0, n_rn_imgs):
-                rotation = rnd.gauss(0, max_rotation/3)
-                if rotation > max_rotation:
-                    rotation = max_rotation
-                elif rotation < -max_rotation:
-                    rotation = -max_rotation
-                
-                # Rotate the drone image randomly
-                cur_drone_im = drone_im.rotate(rotation)
-                cur_width  = cur_drone_im.size[0]
-                cur_height = cur_drone_im.size[1]
+            width_max = min(bg_width, dr_size[0], maximal_bb_width)
+            height_max = min(bg_height, dr_size[1], maximal_bb_height)
 
-                min_resize_ratio = max(width_min/cur_width, height_min/cur_height)
-                max_resize_ratio = min(width_max/cur_width, height_max/cur_height)
-                resize_ratio = rnd.uniform(min_resize_ratio, max_resize_ratio)
+            rotation = rnd.gauss(0, max_rotation/3)
+            if rotation > max_rotation:
+                rotation = max_rotation
+            elif rotation < -max_rotation:
+                rotation = -max_rotation
 
-                # Resize the drone image randomly
-                cur_width  = int(np.round(cur_width*resize_ratio))
-                cur_height = int(np.round(cur_height*resize_ratio))
-                cur_drone_im = cur_drone_im.resize((cur_width, cur_height))
+            # Rotate the object image randomly
+            cur_object_im = object_im.rotate(rotation)
+            cur_width  = cur_object_im.size[0]
+            cur_height = cur_object_im.size[1]
 
-                xpos_max = bg_size[0] - cur_width
-                ypos_max = bg_size[1] - cur_height
+            min_resize_ratio = max(width_min/cur_width, height_min/cur_height)
+            max_resize_ratio = min(width_max/cur_width, height_max/cur_height)
+            resize_ratio = rnd.uniform(min_resize_ratio, max_resize_ratio)
 
-                xpos = rnd.randint(xpos_min, xpos_max)
-                ypos = rnd.randint(ypos_min, ypos_max)
+            # Resize the object image randomly
+            cur_width  = int(np.round(cur_width*resize_ratio))
+            cur_height = int(np.round(cur_height*resize_ratio))
+            cur_object_im = cur_object_im.resize((cur_width, cur_height))
 
-                tmp = Image.new("RGBA", backg_im.size)
-                tmp.paste(cur_drone_im, (xpos,ypos), cur_drone_im)
-                final = Image.alpha_composite(backg_im, tmp)
+            xpos_max = bg_size[0] - cur_width
+            ypos_max = bg_size[1] - cur_height
 
-                cur_center = (xpos+int(np.floor(cur_width/2)), ypos+int(np.floor(cur_height/2)))
-                cur_bb = (cur_width, cur_height)
+            xpos = rnd.randint(xpos_min, xpos_max)
+            ypos = rnd.randint(ypos_min, ypos_max)
 
-                # Save the generated image
-                im_fname = "dsimage_{:d}.png".format(im_it)
-                final.save("{:s}/{:s}".format(out_folder, im_fname))
-                label = (im_it, im_fname, cur_center, cur_bb)
-                labels[im_it] = label
+            # Change the contrast and brightness randomly
+            cur_contrast = min(max(1.0-min_contrast_change, rnd.gauss(1.0, min_contrast_change/3.0)), 1.0+min_contrast_change)
+            cur_brightness = min(max(1.0-max_brightness_change, rnd.gauss(1.0, max_brightness_change/3.0)), 1.0+max_brightness_change)
 
-                im_it = im_it + 1
-                print("Finished {:d}/{:d} images".format(im_it, tot_imgs))
+            cur_object_im = ImageEnhance.Brightness(ImageEnhance.Contrast(cur_object_im).enhance(cur_contrast)).enhance(cur_brightness)
+
+            tmp = Image.new("RGBA", backgr_im.size)
+            tmp.paste(cur_object_im, (xpos,ypos), cur_object_im)
+
+            generated_image = Image.alpha_composite(generated_image, tmp)
+
+            cur_center = ((xpos+cur_width/2)/bg_width, (ypos+cur_height/2)/bg_height)
+            cur_bb = (cur_width/bg_height, cur_height/bg_width)
+
+            object_bb = (label, cur_center, cur_bb)
+            object_bbs_in_image[obj_it] = object_bb
+
+        # Save the generated image
+        im_fname = "dsimage_{:d}.png".format(im_it)
+        generated_image.save("{:s}/{:s}".format(out_folder, im_fname))
+
+        with open("{:s}/{:s}".format(out_folder, "dsimage_{:d}.txt".format(im_it)), 'w') as ofname:
+            for object_bb in object_bbs_in_image:
+                ofname.write("{:d} {:f} {:f} {:f} {:f}\n".format(object_bb[0],
+                                                                     object_bb[1][0], object_bb[1][1],
+                                                                     object_bb[2][0], object_bb[2][1]))
+
+        im_it = im_it + 1
+        print("Finished {:d}/{:d} images".format(im_it, n_imgs))
+
+
+def main():
+    # TODO: Load these parameters from a file or command line
+    backgr_im_folder = "input/backgrounds"
+    backgr_im_fnames = os.listdir(backgr_im_folder)
+    backgr_im_fnames.sort()
+    object_im_folder = "input/objects"
+    object_im_fnames = os.listdir(object_im_folder)
+    object_im_fnames.sort()
+
+    n_train_imgs = 2000
+    n_test_imgs = 200
+    tr_out_folder = "output/training"
+    ts_out_folder = "output/testing"
+
+    print("Loading background images:")
+    backgr_ims = []
+    for im_fname in backgr_im_fnames:
+        im = Image.open("{:s}/{:s}".format(backgr_im_folder, im_fname))
+        if im.size[0] > max_bg_im_width or im.size[1] > max_bg_im_height:
+            ratio = min(max_bg_im_width/im.size[0], max_bg_im_height/im.size[1])
+            im = im.resize((int(np.floor(im.size[0]*ratio)), int(np.floor(im.size[1]*ratio))))
+        backgr_ims.append(im)
+        print(im_fname, "-", backgr_ims[len(backgr_ims)-1].mode)
+
+    print("Loading object images:")
+    object_ims = []
+    for im_fname in object_im_fnames:
+        object_ims.append(Image.open("{:s}/{:s}".format(object_im_folder, im_fname)))
+        print(im_fname, "-", object_ims[len(object_ims)-1].mode)
+
+    print("------ Starting generation of {:d} total training images ------".format(n_train_imgs))
+    generate_images(backgr_ims, object_ims, n_train_imgs, tr_out_folder)
+    print("------ Finished generating training images ------")
+
+    print("------ Starting generation of {:d} total testing images ------".format(n_test_imgs))
+    generate_images(backgr_ims, object_ims, n_test_imgs, ts_out_folder)
+    print("------ Finished generating testing images ------")
 
     print("Ended dataset generation")
-    print("Saving labels")
-    with open("{:s}/{:s}".format(out_folder, labels_fname), 'w') as ofname:
-        ofname.write("ID; image filename; center x; center y; bb width; bb height\n")
-        for label in labels:
-            ofname.write("{:d}; {:s}; {:d}; {:d}; {:d}; {:d}\n".format(label[0],
-                                                                       label[1],
-                                                                       label[2][0], label[2][1],
-                                                                       label[3][0], label[3][1]))
     print("Done with everything. Goodbye.")
-
 
 
 if __name__ == "__main__":

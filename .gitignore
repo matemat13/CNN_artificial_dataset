@@ -5,7 +5,9 @@
 *.JPG
 *.xcf
 # Ignore the generated dataset files
-dataset
+input
+output
+source_images
 # Ignore vim swap files
 *.swp
 # Ignore PyCharm project folder
