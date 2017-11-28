@@ -88,10 +88,13 @@ def generate_images(backgr_ims, object_ims, n_imgs, out_folder):
 
             generated_image = Image.alpha_composite(generated_image, tmp)
 
-            cur_center = ((xpos+cur_width/2)/bg_width, (ypos+cur_height/2)/bg_height)
-            cur_bb = (cur_width/bg_height, cur_height/bg_width)
+            lefttop_pt = (xpos/bg_width, ypos/bg_height)
+            rightbot_pt = ((xpos+cur_width)/bg_width, (ypos+cur_height)/bg_height)
+            # cur_center = ((xpos+cur_width/2)/bg_width, (ypos+cur_height/2)/bg_height)
+            # cur_bb = (cur_width/bg_height, cur_height/bg_width)
 
-            object_bb = (label, cur_center, cur_bb)
+            # object_bb = (label, cur_center, cur_bb)
+            object_bb = (label, lefttop_pt, rightbot_pt)
             object_bbs_in_image[obj_it] = object_bb
 
         # Save the generated image
