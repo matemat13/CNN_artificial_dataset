@@ -15,8 +15,8 @@ max_bg_im_width = 640
 max_bg_im_height = 480
 minimal_bb_width = 100
 minimal_bb_height = 80
-max_rotation = 45  # in degrees
-max_objects_in_image = 4
+max_rotation = 0  # in degrees
+max_objects_in_image = 1
 label = 0
 min_contrast_change = 0.25
 max_brightness_change = 0.25
@@ -88,18 +88,21 @@ def generate_images(backgr_ims, object_ims, n_imgs, out_folder):
 
             generated_image = Image.alpha_composite(generated_image, tmp)
 
-            lefttop_pt = (xpos/bg_width, ypos/bg_height)
-            rightbot_pt = ((xpos+cur_width)/bg_width, (ypos+cur_height)/bg_height)
-            # cur_center = ((xpos+cur_width/2)/bg_width, (ypos+cur_height/2)/bg_height)
-            # cur_bb = (cur_width/bg_height, cur_height/bg_width)
+            # lefttop_pt = (xpos/bg_width, ypos/bg_height)
+            # rightbot_pt = ((xpos+cur_width)/bg_width, (ypos+cur_height)/bg_height)
+            cur_center = ((xpos+cur_width/2)/bg_width, (ypos+cur_height/2)/bg_height)
+            cur_bb = (cur_width/bg_height, cur_height/bg_width)
 
-            # object_bb = (label, cur_center, cur_bb)
-            object_bb = (label, lefttop_pt, rightbot_pt)
+            object_bb = (label, cur_center, cur_bb)
+            # object_bb = (label, lefttop_pt, rightbot_pt)
             object_bbs_in_image[obj_it] = object_bb
 
-        # Save the generated image
         im_fname = "dsimage_{:d}.png".format(im_it)
-        generated_image.save("{:s}/{:s}".format(out_folder, im_fname))
+        # Convert the generated image to not include alpha channel (it was used only for blending the images)
+        final_image = Image.new("RGB", generated_image.size, (255, 255, 255))
+        final_image.paste(generated_image, mask=generated_image.split()[3])  # 3 is the alpha channel
+        # Save the generated image
+        final_image.save("{:s}/{:s}".format(out_folder, im_fname))
 
         with open("{:s}/{:s}".format(out_folder, "dsimage_{:d}.txt".format(im_it)), 'w') as ofname:
             for object_bb in object_bbs_in_image:
