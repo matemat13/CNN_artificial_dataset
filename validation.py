@@ -97,9 +97,9 @@ def calc_IoU(bbox1, bbox2):
 def validate_image(img_name, vl_bboxes, IoU_threshold=0.5, show=False):
     gt_bboxes = load_bboxes(img_name)
     if gt_bboxes is None:  # this happens when the label file is not found
-        return (None, None)
+        return None
 
-    gt_used = len(gt_bboxes)*[False]
+    vl_used = len(vl_bboxes)*[False]
     n_FPs = 0
     n_FNs = 0
     n_bboxes = len(gt_bboxes)
@@ -118,33 +118,33 @@ def validate_image(img_name, vl_bboxes, IoU_threshold=0.5, show=False):
         k = cv2.waitKey(0)  # 0 - wait forever
 	
     score_total = 0.0
-    for vl_bbox in vl_bboxes:
+    for gt_bbox in gt_bboxes:
         max_IoU_set = False
         max_IoU_it = None
         max_IoU = None
-        for gt_it in range(0, len(gt_bboxes)):
-            if not gt_used[gt_it]:
-                cur_IoU = calc_IoU(gt_bboxes[gt_it], vl_bbox)
+        for vl_it in range(0, len(vl_bboxes)):
+            if not vl_used[vl_it]:
+                cur_IoU = calc_IoU(vl_bboxes[vl_it], gt_bbox)
                 if cur_IoU > IoU_threshold and (not max_IoU_set or cur_IoU > max_IoU):
                     max_IoU = cur_IoU
                     max_IoU_set = True
-                    max_IoU_it = gt_it
+                    max_IoU_it = vl_it
 
-        if max_IoU_set:  # if a ground truth bounding box is left
-            gt_used[max_IoU_it] = True
+        if max_IoU_set:
+            vl_used[max_IoU_it] = True
             # avg_IoU = (avg_IoU*n_IoU + max_IoU)/float(n_IoU+1) 
             # n_IoU += 1
             score_total += max_IoU
         else:    # If all ground truth bounding boxes were used and there are still some bounding boxes in the validation set
             # This means that we have a false positive
-            n_FPs += 1
+            n_FNs += 1
             # avg_IoU = (avg_IoU*n_IoU + 0.0)/float(n_IoU+1) 
             # n_IoU += 1
 
     # If there are any ground truth bounding boxes left and false negative counting is on, count them into the error
-    for gt_it in range(0, len(gt_bboxes)):
-        if not gt_used[gt_it]:
-            n_FNs += 1
+    for vl_it in range(0, len(vl_bboxes)):
+        if not vl_used[vl_it]:
+            n_FPs += 1
             # avg_IoU = (avg_IoU*n_IoU + 0.0)/float(n_IoU+1) 
             # n_IoU += 1
 
